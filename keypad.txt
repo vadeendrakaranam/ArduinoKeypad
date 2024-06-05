@@ -1,0 +1,151 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Keypad.h>
+
+#define OLED_ADDR 0x3C
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+const byte ROWS = 4;
+const byte COLS = 4;
+char keys[ROWS][COLS] = {
+   {'4','0','8','C'},
+  {'5','1','9','D'},
+  {'6','2','A','E'},
+  {'7','3','B','F'}
+};
+
+byte rowPins[ROWS] = {A0, A1, A2, A3}; // Row pins
+byte colPins[COLS] = {4, 5, 12, 13};   // Column pins
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+const int buzzerPin = 2; // Buzzer connected to digital pin 2 (pin 1 of ZIF socket)
+const int ledPin = 8; // LED connected to digital pin 8
+
+unsigned long buzzerStartTime = 0;
+unsigned long ledStartTime = 0;
+bool enterPasswordPromptDisplayed = false;
+
+// Declare input and index as global variables
+char input[5];
+int index = 0;
+
+void setup() {
+  pinMode(buzzerPin, OUTPUT); // Set buzzer pin as output
+  pinMode(ledPin, OUTPUT); // Set LED pin as output
+
+  Wire.begin();
+  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+  }
+
+  display.display();
+  delay(2000);
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(F("     PROJECT\n"));
+  display.println(F("Press 0123 for LED"));
+  display.println(F("Press ABCD for Buzzer\n"));
+  display.println(F("\n   VADEENDRA.K"));
+  display.display();
+  delay(5000);
+
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println(F("Enter password:"));
+  display.display();
+}
+
+void loop() {
+  char key = keypad.getKey();
+  if (key) {
+    input[index++] = key;
+    input[index] = '\0';
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.print("Password: ");
+    display.println(input);
+    display.display();
+
+    if (strcmp(input, "0123") == 0) {
+      glowLED();
+      clearInput();
+      displayEnterPasswordPrompt();
+    } else if (strcmp(input, "ABCD") == 0) {
+      buzzBuzzer();
+      clearInput();
+      displayEnterPasswordPrompt();
+    }
+  }
+
+  // Check if the LED is on and display the status on OLED
+  if (digitalRead(ledPin) == HIGH && millis() - ledStartTime < 5000) {
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("LED is on");
+    display.display();
+  } else if (digitalRead(ledPin) == LOW) {
+    displayEnterPasswordPrompt();
+  }
+
+  // Check if the buzzer is buzzing and display the status on OLED
+  if (digitalRead(buzzerPin) == HIGH && millis() - buzzerStartTime < 2000) {
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("Buzzer is buzzing");
+    display.display();
+  } else if (digitalRead(buzzerPin) == LOW) {
+    displayEnterPasswordPrompt();
+  }
+
+  delay(100); // Add a small delay to avoid button bounce
+}
+
+void buzzBuzzer() {
+  digitalWrite(buzzerPin, HIGH);
+  buzzerStartTime = millis(); // Record the buzzer start time
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Buzzer is ON");
+  display.display();
+  delay(3000); // Buzz for 3 seconds
+  digitalWrite(buzzerPin, LOW);
+  enterPasswordPromptDisplayed = false; // Reset the prompt flag
+}
+
+void glowLED() {
+  digitalWrite(ledPin, HIGH);
+  ledStartTime = millis(); // Record the LED start time
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("LED is on");
+  display.display();
+  delay(5000); // Glow for 5 seconds
+  digitalWrite(ledPin, LOW);
+  enterPasswordPromptDisplayed = false; // Reset the prompt flag
+}
+
+void clearInput() {
+  for (int i = 0; i < 5; i++) {
+    input[i] = '\0';
+  }
+  index = 0;
+}
+
+void displayEnterPasswordPrompt() {
+  if (!enterPasswordPromptDisplayed) {
+    enterPasswordPromptDisplayed = true;
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("Enter password:"));
+    display.display();
+  }
+}
